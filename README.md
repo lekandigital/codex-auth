@@ -124,7 +124,7 @@ Tab cycles candidates inline by default on PowerShell 5.1 and 7+; for a menu pic
 ```shell
 codex-auth list
 codex-auth list --active
-codex-auth switch          # next account: 1 -> 2 -> 3 -> 1
+codex-auth switch          # next account: 1 -> 2 -> 3 -> 1, then lists every account's usage
 codex-auth switch --live   # pick from a list
 codex-auth switch 02
 codex-auth remove work

@@ -557,6 +557,14 @@ pub fn printRemoveSummary(labels: []const []const u8) !void {
     try out.flush();
 }
 
+pub fn printBlankLine() !void {
+    var stdout: io_util.Stdout = undefined;
+    stdout.init();
+    const out = stdout.out();
+    try out.writeAll("\n");
+    try out.flush();
+}
+
 pub fn printSwitchedAccount(
     allocator: std.mem.Allocator,
     reg: *registry.Registry,

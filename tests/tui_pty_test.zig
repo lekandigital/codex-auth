@@ -235,6 +235,17 @@ fn spawnLiveList(
     codex_home: []const u8,
     extra_env: []const [2][]const u8,
 ) !struct { session: PtySession, master: c_int } {
+    return spawnCliInPty(allocator, &.{ exe, "list", "--live", "--skip-api" }, cwd, home, codex_home, extra_env);
+}
+
+fn spawnCliInPty(
+    allocator: std.mem.Allocator,
+    argv: []const []const u8,
+    cwd: []const u8,
+    home: []const u8,
+    codex_home: []const u8,
+    extra_env: []const [2][]const u8,
+) !struct { session: PtySession, master: c_int } {
     var env_map = std.process.Environ.Map.init(allocator);
     defer env_map.deinit();
     try env_map.put("HOME", home);
@@ -247,7 +258,7 @@ fn spawnLiveList(
     errdefer pty.deinit();
     const slave_file: std.Io.File = .{ .handle = pty.slave, .flags = .{ .nonblocking = false } };
     const child = try std.process.spawn(fs.io(), .{
-        .argv = &.{ exe, "list", "--live", "--skip-api" },
+        .argv = argv,
         .cwd = .{ .path = cwd },
         .environ_map = &env_map,
         .stdin = .{ .file = slave_file },
@@ -297,6 +308,49 @@ fn seedAccounts(allocator: std.mem.Allocator, home_root: []const u8, count: usiz
         const data = try fixtures.authJsonWithEmailPlan(allocator, email, "plus");
         defer allocator.free(data);
         try fs.cwd().writeFile(.{ .sub_path = path, .data = data });
+    }
+}
+
+test "pty: switch in a terminal shows every account after switching" {
+    if (comptime !has_pty) return error.SkipZigTest;
+    const gpa = std.testing.allocator;
+    const project_root = try projectRootAlloc(gpa);
+    defer gpa.free(project_root);
+    try buildCliBinary(gpa, project_root);
+    const exe = try builtCliPathAlloc(gpa, project_root);
+    defer gpa.free(exe);
+
+    var tmp = fs.tmpDir(.{});
+    defer tmp.cleanup();
+    const home = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(home);
+    const codex_home = try fs.path.join(gpa, &.{ home, ".codex" });
+    defer gpa.free(codex_home);
+    try tmp.dir.makePath(".codex");
+    try seedAccounts(gpa, home, 3);
+    // No curl and no codex on PATH: the overview must fall back to stored
+    // usage instead of reaching the network, and no daemon is coordinated.
+    try tmp.dir.makePath("empty-bin");
+    const empty_bin = try fs.path.join(gpa, &.{ home, "empty-bin" });
+    defer gpa.free(empty_bin);
+
+    const spawned = try spawnCliInPty(gpa, &.{ exe, "switch" }, home, home, codex_home, &.{
+        .{ "PATH", empty_bin },
+    });
+    var session = spawned.session;
+    const master = spawned.master;
+    defer _ = close(master);
+    defer session.output.deinit(gpa);
+    defer if (!session.done) session.child.kill(fs.io());
+
+    try std.testing.expectEqual(@as(u8, 0), try session.finish(master));
+
+    const out = session.output.items;
+    const switched = std.mem.indexOf(u8, out, "Switched to u00(user00@example.com)") orelse return error.TestUnexpectedResult;
+    const header = std.mem.indexOf(u8, out, "ACCOUNT") orelse return error.TestUnexpectedResult;
+    try std.testing.expect(header > switched);
+    for ([_][]const u8{ "user00@example.com", "user01@example.com", "user02@example.com" }) |email| {
+        try std.testing.expect(std.mem.indexOf(u8, out[header..], email) != null);
     }
 }
 

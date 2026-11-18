@@ -75,6 +75,7 @@ When switching succeeds:
 3. `active_account_key` is updated in `registry.json`.
 4. `previous_active_account_key` records the account that was active before the switch, when one exists.
 5. The success message uses the same identity label as singleton rows, for example `Switched to me(test@example.com)`.
+6. When stdout is a terminal, every account is then listed with its usage -- the same table as `codex-auth list`, with the new active account marked `*`. Usage is refreshed from the API; if that cannot run, stored snapshots are shown. Piped or captured output, `--json`, and `--live` skip the table, and it never changes the exit code.
 
 The previous-account pointer is internal CLI state and is not included in JSON responses.
 

@@ -7,6 +7,8 @@ const preflight = @import("preflight.zig");
 const query_mod = @import("query.zig");
 const results = @import("results.zig");
 const daemon = @import("codex_daemon.zig");
+const list_flow = @import("list.zig");
+const transport_mod = @import("../api/transport.zig");
 
 const ensureLiveTty = preflight.ensureLiveTty;
 const resolveSwitchQueryLocally = query_mod.resolveSwitchQueryLocally;
@@ -223,6 +225,21 @@ fn handleSwitchNext(
     try activateSelection(allocator, codex_home, &reg, reg.accounts.items[next_idx].account_key, opts);
 }
 
+/// After a one-shot switch, show every account with its usage -- the same table
+/// as `codex-auth list` -- when stdout is a terminal, so scripts and captured
+/// output keep the single "Switched to" line. Usage is refreshed from the API;
+/// when that cannot run, the stored snapshots are shown instead. Best effort:
+/// the switch is already applied, so nothing here changes the exit code.
+fn showAccountsAfterSwitch(allocator: std.mem.Allocator, codex_home: []const u8) void {
+    if (!(std.Io.File.stdout().isTty(app_runtime.io()) catch false)) return;
+    cli.output.printBlankLine() catch return;
+    list_flow.handleList(allocator, transport_mod.Transport.curl(), codex_home, .{}) catch {
+        list_flow.handleList(allocator, transport_mod.Transport.curl(), codex_home, .{ .api_mode = .skip_api }) catch |err| {
+            std.log.warn("could not show accounts after switching: {s}", .{@errorName(err)});
+        };
+    };
+}
+
 fn handleSwitchQueryJson(
     allocator: std.mem.Allocator,
     codex_home: []const u8,
@@ -275,6 +292,9 @@ fn activateSelection(
         return if (opts.json) printJsonMutationError(err) else err;
     };
     if (!opts.json) try cli.output.printSwitchedAccount(allocator, reg, account_key);
+    // The account is switched from here on, so every exit below -- including
+    // a daemon restart failure -- ends with the account overview.
+    defer if (!opts.json) showAccountsAfterSwitch(allocator, codex_home);
     var client = daemon.Client.init(allocator, codex_home) catch |err| {
         if (err == error.OutOfMemory) return err;
         // A missing executable is only absence when the control socket is
