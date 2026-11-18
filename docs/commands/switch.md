@@ -4,7 +4,8 @@
 
 ```shell
 codex-auth - [--json] [--no-restart-daemon]
-codex-auth switch [--api|--skip-api] [--no-restart-daemon]
+codex-auth switch [--no-restart-daemon]
+codex-auth switch --api|--skip-api [--no-restart-daemon]
 codex-auth switch --live [--api|--skip-api] [--no-restart-daemon]
 codex-auth switch <query> [--no-restart-daemon]
 codex-auth switch <query> --json [--no-restart-daemon]
@@ -18,9 +19,18 @@ codex-auth switch <query> --json [--no-restart-daemon]
 - The command fails when the recorded previous account was removed.
 - Only the top-level `-` form is the shortcut: `codex-auth switch -` treats `-` as an ordinary account query.
 
+## Next-Account Switch
+
+`codex-auth switch` with no target switches to the account after the active one, in the same order and numbering as `list`, and wraps from the last row back to the first: with accounts 1, 2 and 3, it goes 1 → 2 → 3 → 1.
+
+- It resolves the target from stored local data and does not run remote refresh, like a query switch.
+- With no active account it switches to row 1.
+- It fails with "no other account to switch to" when only one account is stored.
+- `--no-restart-daemon` is accepted; `--json` still requires an explicit query.
+
 ## Interactive Switch
 
-`codex-auth switch` opens the account picker and exits after one successful switch.
+`codex-auth switch --api` or `codex-auth switch --skip-api` opens the account picker and exits after one successful switch.
 
 - The picker uses the same account ordering as `list`.
 - `q` quits without switching.

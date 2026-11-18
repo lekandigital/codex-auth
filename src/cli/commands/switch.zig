@@ -89,6 +89,9 @@ fn parseArgs(allocator: std.mem.Allocator, args: []const [:0]const u8, previous:
         opts.target = .{ .query = try allocator.dupe(u8, arg) };
     }
     if (previous) opts.target = .previous;
+    // A bare `switch` rotates to the next account in `list` order. The picker
+    // flags (`--live`, `--api`, `--skip-api`) still open the account picker.
+    if (opts.target == .picker and !opts.live and !opts.json and opts.api_mode == .default) opts.target = .next;
     if (opts.live and opts.json) {
         freeTarget(allocator, opts.target);
         return common.usageErrorResultWithJson(allocator, .switch_account, true, "`--live` cannot be combined with `--json`.", .{});

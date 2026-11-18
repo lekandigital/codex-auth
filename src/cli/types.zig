@@ -29,6 +29,8 @@ pub const SwitchTarget = union(enum) {
     picker,
     query: []u8,
     previous,
+    /// Bare `switch`: rotate to the account after the active one in `list` order.
+    next,
 };
 pub const SwitchOptions = struct {
     target: SwitchTarget = .picker,

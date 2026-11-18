@@ -21,6 +21,7 @@ pub fn isHandledCliError(err: anyerror) bool {
         err == error.SelectorResolutionFailed or
         err == error.StateUncertain or
         err == error.NoPreviousAccount or
+        err == error.NoOtherAccount or
         err == error.PreviousAccountUnavailable or
         err == error.RegistryError or
         err == error.CodexLoginFailed or

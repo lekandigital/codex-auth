@@ -243,6 +243,16 @@ pub fn printSwitchAccountNotFoundError(query: []const u8) !void {
     try out.flush();
 }
 
+pub fn printNoOtherAccountError() !void {
+    var stderr: io_util.Stderr = undefined;
+    stderr.init();
+    const out = stderr.out();
+    const use_color = stderr.color_enabled;
+    try writeErrorPrefixTo(out, use_color);
+    try out.writeAll(" no other account to switch to; add one with `codex-auth login`.\n");
+    try out.flush();
+}
+
 pub fn printNoPreviousAccountError() !void {
     var stderr: io_util.Stderr = undefined;
     stderr.init();

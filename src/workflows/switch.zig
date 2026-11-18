@@ -23,6 +23,7 @@ pub fn handleSwitch(allocator: std.mem.Allocator, codex_home: []const u8, opts: 
     switch (opts.target) {
         .query => |query| return handleSwitchQuery(allocator, codex_home, opts, query),
         .previous => return handleSwitchPrevious(allocator, codex_home, opts),
+        .next => return handleSwitchNext(allocator, codex_home, opts),
         .picker => {},
     }
 
@@ -198,6 +199,28 @@ fn handleSwitchPrevious(
     }
 
     try activateSelection(allocator, codex_home, &reg, previous_account_key, opts);
+}
+
+fn handleSwitchNext(
+    allocator: std.mem.Allocator,
+    codex_home: []const u8,
+    opts: cli.types.SwitchOptions,
+) !void {
+    std.debug.assert(opts.api_mode == .default);
+    std.debug.assert(!opts.live);
+    std.debug.assert(!opts.json);
+
+    var reg = try registry.loadRegistry(allocator, codex_home);
+    defer reg.deinit(allocator);
+    if (try registry.syncActiveAccountFromAuth(allocator, codex_home, &reg)) {
+        try registry.saveRegistry(allocator, codex_home, &reg);
+    }
+
+    const next_idx = try query_mod.findNextAccountIndexInDisplayOrder(allocator, &reg) orelse {
+        try cli.output.printNoOtherAccountError();
+        return error.NoOtherAccount;
+    };
+    try activateSelection(allocator, codex_home, &reg, reg.accounts.items[next_idx].account_key, opts);
 }
 
 fn handleSwitchQueryJson(

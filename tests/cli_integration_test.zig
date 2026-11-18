@@ -2614,6 +2614,110 @@ test "Scenario: Given switch query with a direct local match when running switch
     try std.testing.expect(std.mem.eql(u8, loaded.previous_active_account_key.?, active_key));
 }
 
+fn seedRotationFixture(allocator: std.mem.Allocator, home_root: []const u8, emails: []const []const u8, aliases: []const []const u8, active_email: []const u8) !void {
+    var entries: [3]SeedAccount = undefined;
+    for (emails, aliases, 0..) |email, alias, i| entries[i] = .{ .email = email, .alias = alias };
+    try seedRegistryWithAccounts(allocator, home_root, active_email, entries[0..emails.len]);
+    const home = try codexHomeAlloc(allocator, home_root);
+    defer allocator.free(home);
+    for (emails) |email| {
+        const key = try fixtures.accountKeyForEmailAlloc(allocator, email);
+        defer allocator.free(key);
+        const path = try registry.accountAuthPath(allocator, home, key);
+        defer allocator.free(path);
+        const data = try fixtures.authJsonWithEmailPlan(allocator, email, "plus");
+        defer allocator.free(data);
+        try fs.cwd().writeFile(.{ .sub_path = path, .data = data });
+        if (std.mem.eql(u8, email, active_email)) {
+            const active = try registry.activeAuthPath(allocator, home);
+            defer allocator.free(active);
+            try fs.cwd().writeFile(.{ .sub_path = active, .data = data });
+        }
+    }
+}
+
+test "Scenario: Given three accounts when running bare switch then it rotates 2 to 3 and wraps 3 to 1" {
+    const gpa = std.testing.allocator;
+    const project_root = try projectRootAlloc(gpa);
+    defer gpa.free(project_root);
+    try buildCliBinary(gpa, project_root);
+
+    var tmp = fs.tmpDir(.{});
+    defer tmp.cleanup();
+    const home_root = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(home_root);
+
+    try seedRotationFixture(
+        gpa,
+        home_root,
+        &.{ "alpha@example.com", "beta@example.com", "gamma@example.com" },
+        &.{ "alpha", "beta", "gamma" },
+        "beta@example.com",
+    );
+
+    try tmp.dir.makePath("empty-bin");
+    const empty_path = try tmp.dir.realpathAlloc(gpa, "empty-bin");
+    defer gpa.free(empty_path);
+    const codex_home = try codexHomeAlloc(gpa, home_root);
+    defer gpa.free(codex_home);
+
+    const expected = [_]struct { stdout: []const u8, email: []const u8 }{
+        .{ .stdout = "Switched to gamma(gamma@example.com)\n", .email = "gamma@example.com" },
+        .{ .stdout = "Switched to alpha(alpha@example.com)\n", .email = "alpha@example.com" },
+        .{ .stdout = "Switched to beta(beta@example.com)\n", .email = "beta@example.com" },
+    };
+    for (expected) |step| {
+        const result = try runCliWithIsolatedHomeAndPath(gpa, project_root, home_root, empty_path, &[_][]const u8{"switch"});
+        defer gpa.free(result.stdout);
+        defer gpa.free(result.stderr);
+
+        try expectSuccess(result);
+        try std.testing.expectEqualStrings(step.stdout, result.stdout);
+        try std.testing.expectEqualStrings("", result.stderr);
+
+        var loaded = try registry.loadRegistry(gpa, codex_home);
+        defer loaded.deinit(gpa);
+        const want_key = try fixtures.accountKeyForEmailAlloc(gpa, step.email);
+        defer gpa.free(want_key);
+        try std.testing.expect(loaded.active_account_key != null);
+        try std.testing.expectEqualStrings(want_key, loaded.active_account_key.?);
+
+        const auth_path = try authJsonPathAlloc(gpa, home_root);
+        defer gpa.free(auth_path);
+        const auth_after = try fixtures.readFileAlloc(gpa, auth_path);
+        defer gpa.free(auth_after);
+        const want_auth = try fixtures.authJsonWithEmailPlan(gpa, step.email, "plus");
+        defer gpa.free(want_auth);
+        try std.testing.expectEqualStrings(want_auth, auth_after);
+    }
+}
+
+test "Scenario: Given only one account when running bare switch then it explains there is no other account" {
+    const gpa = std.testing.allocator;
+    const project_root = try projectRootAlloc(gpa);
+    defer gpa.free(project_root);
+    try buildCliBinary(gpa, project_root);
+
+    var tmp = fs.tmpDir(.{});
+    defer tmp.cleanup();
+    const home_root = try tmp.dir.realpathAlloc(gpa, ".");
+    defer gpa.free(home_root);
+
+    try seedRotationFixture(gpa, home_root, &.{"solo@example.com"}, &.{"solo"}, "solo@example.com");
+
+    try tmp.dir.makePath("empty-bin");
+    const empty_path = try tmp.dir.realpathAlloc(gpa, "empty-bin");
+    defer gpa.free(empty_path);
+
+    const result = try runCliWithIsolatedHomeAndPath(gpa, project_root, home_root, empty_path, &[_][]const u8{"switch"});
+    defer gpa.free(result.stdout);
+    defer gpa.free(result.stderr);
+
+    try expectFailure(result);
+    try std.testing.expectEqualStrings("", result.stdout);
+    try std.testing.expect(std.mem.find(u8, result.stderr, "no other account to switch to") != null);
+}
+
 test "Scenario: Given previous account exists when running top-level dash then it switches back and forth" {
     const gpa = std.testing.allocator;
     const project_root = try projectRootAlloc(gpa);
@@ -3645,7 +3749,7 @@ test "Scenario: Given switch query with skip-api flag when running switch then i
     try std.testing.expect(std.mem.find(u8, result.stderr, "does not support `--live`, `--api`, or `--skip-api`") != null);
 }
 
-test "Scenario: Given switch without api flags when running interactively then it requires api refresh executables by default" {
+test "Scenario: Given switch picker with api flag when running interactively then it requires api refresh executables" {
     const gpa = std.testing.allocator;
     const project_root = try projectRootAlloc(gpa);
     defer gpa.free(project_root);
@@ -3671,7 +3775,7 @@ test "Scenario: Given switch without api flags when running interactively then i
         project_root,
         home_root,
         empty_path,
-        &[_][]const u8{"switch"},
+        &[_][]const u8{ "switch", "--api" },
         "2\n",
     );
     defer gpa.free(result.stdout);

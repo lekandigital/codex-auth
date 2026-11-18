@@ -57,7 +57,8 @@ Detailed command documentation lives in [docs/commands/README.md](./docs/command
 |---------|-------------|
 | [`codex-auth list [--live] [--active] [--api\|--skip-api]`](./docs/commands/list.md) | List stored accounts and usage state |
 | [`codex-auth login [--device-auth]`](./docs/commands/login.md) | Run `codex login`, then add the current account |
-| [`codex-auth switch [--live] [--api\|--skip-api]`](./docs/commands/switch.md) | Switch the active account interactively |
+| [`codex-auth switch`](./docs/commands/switch.md) | Switch to the next account in `list` order (1 → 2 → 3 → 1) |
+| [`codex-auth switch --live\|--api\|--skip-api`](./docs/commands/switch.md) | Pick the account to switch to interactively |
 | [`codex-auth switch <query>`](./docs/commands/switch.md) | Switch directly by row number or account selector |
 | [`codex-auth remove [--live] [--api\|--skip-api]`](./docs/commands/remove.md) | Remove accounts interactively |
 | [`codex-auth remove <query> [<query>...]`](./docs/commands/remove.md) | Remove accounts by selector |
@@ -123,7 +124,8 @@ Tab cycles candidates inline by default on PowerShell 5.1 and 7+; for a menu pic
 ```shell
 codex-auth list
 codex-auth list --active
-codex-auth switch
+codex-auth switch          # next account: 1 -> 2 -> 3 -> 1
+codex-auth switch --live   # pick from a list
 codex-auth switch 02
 codex-auth remove work
 codex-auth import /path/to/auth.json --alias personal

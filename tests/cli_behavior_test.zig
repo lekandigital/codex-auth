@@ -532,7 +532,7 @@ test "Scenario: Given help when rendering then login and command help notes are 
     const help = aw.written();
     try std.testing.expect(std.mem.find(u8, help, "Commands:") != null);
     try std.testing.expect(std.mem.find(u8, help, "list [--live] [--active] [--api|--skip-api] [--json]") != null);
-    try std.testing.expect(std.mem.find(u8, help, "switch [--live] [--api|--skip-api]") != null);
+    try std.testing.expect(std.mem.find(u8, help, "switch --live|--api|--skip-api") != null);
     try std.testing.expect(std.mem.find(u8, help, "alias set <alias|email|display-number|query> <alias>") != null);
     try std.testing.expect(std.mem.find(u8, help, "completion <bash|zsh|fish|pwsh>") != null);
     try std.testing.expect(std.mem.find(u8, help, "config live --interval <seconds>") != null);
@@ -599,6 +599,7 @@ test "Scenario: Given switch command help when rendering then target forms and m
     try std.testing.expect(std.mem.find(u8, help, "codex-auth switch work") != null);
     try std.testing.expect(std.mem.find(u8, help, "Options:\n  --live       Open the live switch UI.") != null);
     try std.testing.expect(std.mem.find(u8, help, "Switch directly when the target resolves to one account.") != null);
+    try std.testing.expect(std.mem.find(u8, help, "Switch to the next account in `list` order (1 -> 2 -> 3 -> 1).") != null);
     try std.testing.expect(std.mem.find(u8, help, "If a target is ambiguous") == null);
     try std.testing.expect(std.mem.find(u8, help, "--no-restart-daemon") != null);
     try std.testing.expect(std.mem.find(u8, help, "daemon issues never change the exit code") != null);
@@ -1498,6 +1499,43 @@ test "Scenario: Given switch previous flag with json when parsing then the unsup
         .usage_error => |usage_err| {
             try std.testing.expect(usage_err.json);
             try std.testing.expect(std.mem.find(u8, usage_err.message, "unknown flag `--previous`") != null);
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "Scenario: Given bare switch when parsing then it targets the next account" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "switch" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    switch (result) {
+        .command => |cmd| switch (cmd) {
+            .switch_account => |opts| {
+                try std.testing.expectEqual(cli.types.SwitchTarget.next, opts.target);
+                try std.testing.expect(!opts.live);
+                try std.testing.expect(!opts.no_restart_daemon);
+            },
+            else => return error.TestExpectedEqual,
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "Scenario: Given bare switch with no-restart-daemon when parsing then it still targets the next account" {
+    const gpa = std.testing.allocator;
+    const args = [_][:0]const u8{ "codex-auth", "switch", "--no-restart-daemon" };
+    var result = try cli.commands.parseArgs(gpa, &args);
+    defer cli.commands.freeParseResult(gpa, &result);
+
+    switch (result) {
+        .command => |cmd| switch (cmd) {
+            .switch_account => |opts| {
+                try std.testing.expectEqual(cli.types.SwitchTarget.next, opts.target);
+                try std.testing.expect(opts.no_restart_daemon);
+            },
+            else => return error.TestExpectedEqual,
         },
         else => return error.TestExpectedEqual,
     }

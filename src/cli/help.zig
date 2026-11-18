@@ -45,7 +45,8 @@ pub fn writeHelp(
     try writeCommandDetail(out, use_color, "import --purge [<path>]");
     try writeCommandSummary(out, use_color, "export [<dir>] [--cpa]", "Export stored account auth files");
     try writeCommandSummary(out, use_color, "switch", "Switch the active account");
-    try writeCommandDetail(out, use_color, "switch [--live] [--api|--skip-api]");
+    try writeCommandDetail(out, use_color, "switch");
+    try writeCommandDetail(out, use_color, "switch --live|--api|--skip-api");
     try writeCommandDetail(out, use_color, "switch <alias|email|display-number|query>");
     try writeCommandDetail(out, use_color, "switch <query> --json");
     try writeCommandSummary(out, use_color, "remove", "Remove one or more accounts");
@@ -150,7 +151,7 @@ fn commandDescriptionForTopic(topic: HelpTopic) []const u8 {
         .login => "Run `codex login` or `codex login --device-auth`, then add the current account.",
         .import_auth => "Import auth files or rebuild the registry.",
         .export_auth => "Export stored account auth files.",
-        .switch_account => "Switch the active account by alias, email, display number, or partial query.",
+        .switch_account => "Switch to the next account, or to one by alias, email, display number, or partial query.",
         .remove_account => "Remove one or more accounts by alias, email, display number, or partial query.",
         .reset_credits => "Use the available reset credit that expires first.",
         .alias => "Set or clear an account alias by alias, email, display number, or partial query.",
@@ -216,7 +217,8 @@ fn writeUsageLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         },
         .switch_account => {
             try out.writeAll("  codex-auth - [--json] [--no-restart-daemon]\n");
-            try out.writeAll("  codex-auth switch [--live] [--api|--skip-api] [--no-restart-daemon]\n");
+            try out.writeAll("  codex-auth switch [--no-restart-daemon]\n");
+            try out.writeAll("  codex-auth switch --live|--api|--skip-api [--no-restart-daemon]\n");
             try out.writeAll("  codex-auth switch <alias|email|display-number|query> [--no-restart-daemon]\n");
             try out.writeAll("  codex-auth switch <query> --json [--no-restart-daemon]\n");
         },
@@ -298,8 +300,8 @@ fn writeOptionLines(out: *std.Io.Writer, topic: HelpTopic) !void {
         },
         .switch_account => {
             try out.writeAll("  --live       Open the live switch UI.\n");
-            try out.writeAll("  --api        Load usage and account data from APIs.\n");
-            try out.writeAll("  --skip-api   Load usage and account data from local data only (may be inaccurate).\n");
+            try out.writeAll("  --api        Open the account picker, loading usage and account data from APIs.\n");
+            try out.writeAll("  --skip-api   Open the account picker using local data only (may be inaccurate).\n");
             try out.writeAll("  --json       Emit one machine-readable JSON document for non-interactive switch.\n");
             try out.writeAll("  --no-restart-daemon\n");
             try out.writeAll("               After switching, a responsive daemon normally reloads the credentials in\n");
@@ -308,6 +310,7 @@ fn writeOptionLines(out: *std.Io.Writer, topic: HelpTopic) !void {
             try out.writeAll("               and with this flag, daemon issues never change the exit code.\n");
             try out.writeAll("  <alias|email|display-number|query>\n");
             try out.writeAll("               Switch directly when the target resolves to one account.\n");
+            try out.writeAll("  (no target)  Switch to the next account in `list` order (1 -> 2 -> 3 -> 1).\n");
         },
         .remove_account => {
             try out.writeAll("  --live       Open the live remove UI.\n");

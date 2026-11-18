@@ -139,6 +139,34 @@ pub fn findAccountIndexByDisplayNumber(
     return findAccountIndexByRowNumber(allocator, reg, display_number);
 }
 
+/// Index of the account after the active one in `list` display order, wrapping
+/// from the last row back to the first. With no active account it is the first
+/// row. Null when there is no other account to rotate to.
+pub fn findNextAccountIndexInDisplayOrder(
+    allocator: std.mem.Allocator,
+    reg: *registry.Registry,
+) !?usize {
+    var display = try display_rows.buildDisplayRows(allocator, reg, null);
+    defer display.deinit(allocator);
+
+    const count = display.selectable_row_indices.len;
+    if (count == 0) return null;
+
+    var active_pos: ?usize = null;
+    for (display.selectable_row_indices, 0..) |row_idx, pos| {
+        if (display.rows[row_idx].is_active) {
+            active_pos = pos;
+            break;
+        }
+    }
+
+    const next_pos = if (active_pos) |pos| (pos + 1) % count else 0;
+    if (active_pos) |pos| {
+        if (next_pos == pos) return null;
+    }
+    return display.rows[display.selectable_row_indices[next_pos]].account_index;
+}
+
 fn findAccountIndexByRowNumber(
     allocator: std.mem.Allocator,
     reg: *registry.Registry,
